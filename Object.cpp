@@ -14,9 +14,9 @@ using namespace std;
 class Object
 {
 private:
-	int ilosc_danych;//dane do renderu w bajtach
-	int liczba_vertexow;//liczba vertexow do narysowania
-	float *ptr_dane_do_renderu;
+	int data_byets;
+	int vertex_count;
+	float *render_data;
 
 	unsigned int textures[2];
 	unsigned int *tex[2];
@@ -24,193 +24,177 @@ private:
 public:
 	const Object()
 	{
-		liczba_vertexow = 0;
+		vertex_count = 0;
 	}
-
-	void load_objn_mesh(string filename)
+ 
+	void LoadObjectMesh(string filename)
 	{
-
-		string wiersz;//wiersz danych w formie string
-		string x, y, z;//wspó³rzêdne vertexa w formie string
-		string u, v;// wspó³rzêdne uv w formie string
-		string xn, yn, zn;//wspó³rzêdne wektora normalnego w formie string
-		string wiersz_poz_1vert, wiersz_poz_2vert, wiersz_poz_3vert;// numery wierszy w .obj dla pozycji vertexów danego trójk¹ta
-		string wiersz_uv_1vert, wiersz_uv_2vert, wiersz_uv_3vert;//numery wierszy w .obj dla wspó³rzêdnych uv vertexów danego trójk¹ta
-		string wiersz_normalnego_1vert, wiersz_normalnego_2vert, wiersz_normalnego_3vert;//numery wierszy w .obj dla wektorów normalnych vertexów danego trójk¹ta
-		string niepotrzebny;//niepotrzebny fragment wiersza z .obj
+		string line;
+		string x, y, z;
+		string u, v;
+		string xn, yn, zn;
+		string line_pos_1vert, line_pos_2vert, line_pos_3vert;
+		string line_uv_1vert, line_uv_2vert, line_uv_3vert;
+		string line_nomrmal_1vert, line_normal_2vert, line_normal_3vert;
+		string useless;
 		ifstream file;
-		int numer_pierwszego_wiersza_poz_vert = 3;
-		int liczba_wszyst_floatow_do_renderu = 0;
+		int first_line_pos_num_vert = 3;
+		int to_render = 0;
 
-		int liczba_wierszy_pos = 0;
-		int liczba_wierszy_uv = 0;
-		int liczba_wierszy_normal = 0;
-		bool vertexy = true;
-		bool uv_ki = true;
-		bool normalne = true;
-		bool trojkaty = true;
-
+		int pos_line_count = 0;
+		int uv_line_count = 0;
+		int normal_line_count = 0;
+		bool verives = true;
+		bool uv_s = true;
+		bool normal = true;
+		bool triangles = true;
 
 		file.open(filename);
 		if (file.good() == false)
 		{
-			cout << "Nie mozna otworzyc pliku!";
+			cout << "Cannot open the file!";
 		}
 
-		for (int index = 0; index < numer_pierwszego_wiersza_poz_vert; index++)//pierwsze 3 wiersze w .obj nas nie interesuj¹ dlatego przechodzimy przez nie do pierwszego vertexa w .obj
+		for (int index = 0; index < first_line_pos_num_vert; index++)
 		{
-			getline(file, wiersz);
+			getline(file, line);
 		}
 
-		//obliczamy ile jest wierszy z pozycjami vertexów
-		while (vertexy)
+		while (verives)
 		{
-			getline(file, wiersz);//pobieramy wiersz danych
-			if (wiersz.find("vt") != string::npos)//jeœli znajdziemy "vt" to if siê wykona. Funkcja Find() zwraca pozycjê szukanego wyra¿enia "vt" w "wiersz", jeœli 
-			{									  //nie znajdzie szukanego wyra¿enia to zwraca "string::npos"
-				vertexy = false;
-				liczba_wierszy_uv++;//zaczynamy liczyæ wiersze z wspó³rzêdnymi "uv"
+			getline(file, line);
+			if (line.find("vt") != string::npos)
+			{									 
+				verives = false;
+				uv_line_count++;
 			}
 			else
 			{
-				liczba_wierszy_pos++;//liczba wierszy z pozycjami vertexów
+				pos_line_count++;
 			}
-
 		}
-		//kontynuujemy liczenie wierszy ze wspó³rzêdnymi "uv"
-		while (uv_ki)
+		while (uv_s)
 		{
-			getline(file, wiersz);
-			if (wiersz.find("vn") != string::npos)//wykonujemy to samo co wczeœniej z t¹ ró¿nic¹, ¿e tutaj szukamy "vn"
+			getline(file, line);
+			if (line.find("vn") != string::npos)
 			{
-				uv_ki = false;
-				liczba_wierszy_normal++;//zaczynamy liczyæ wiersze z wektorami normalnymi
+				uv_s = false;
+				normal_line_count++;
 			}
 			else
 			{
-				liczba_wierszy_uv++;//liczba wierszy z "uv"
+				uv_line_count++;
 			}
-
 		}
-		//kontynuujemy liczenie wierszy z wektorami normalnymi
-		while (normalne)//obliczanie poz pocz uv i pamieci dla v_list
+		while (normal)
 		{
-			getline(file, wiersz);
-			if (wiersz.find("s off") != string::npos)
+			getline(file, line);
+			if (line.find("s off") != string::npos)
 			{
-				normalne = false;
+				normal = false;
 			}
 			else
 			{
-				liczba_wierszy_normal++;//kontynuacja liczenia wierszy z normalnymi
+				normal_line_count++;
 			}
-
 		}
 
-		while (trojkaty)//obliczanie potrzebnych pamieci do zarezerwowania
+		while (triangles)
 		{
-			getline(file, wiersz);
-			if (wiersz.find("f") != string::npos)
+			getline(file, line);
+			if (line.find("f") != string::npos)
 			{
-				liczba_wszyst_floatow_do_renderu += 24;//24 floaty/trójk¹t. Jeden vertex to (x, y, z, u, v, xn, yn, zn), trójk¹t ma 3 vertexy
-				liczba_vertexow += 3;// +3 bo s¹ 3 vertexy/trójk¹t
+				to_render += 24;
+				vertex_count += 3;
 			}
 			else
 			{
-				trojkaty = false;
+				triangles = false;
 			}
-
 		}
 
-		ptr_dane_do_renderu = new float[liczba_wszyst_floatow_do_renderu];
-		int *ptr_numery_wierszy_poz = new int[liczba_vertexow];
-		int *ptr_numery_wierszy_uv = new int[liczba_vertexow];
-		int *ptr_numery_wierszy_norm = new int[liczba_vertexow];
-		string *ptr_v_string = new string[liczba_wierszy_pos];
-		string *ptr_uv_string = new string[liczba_wierszy_uv];
-		string *ptr_vn_string = new string[liczba_wierszy_normal];
+		render_data = new float[to_render];
+		int *ptr_pos_line_num = new int[vertex_count];
+		int *ptr_uv_line_num = new int[vertex_count];
+		int *ptr_norm_line_num = new int[vertex_count];
+		string *ptr_v_string = new string[pos_line_count];
+		string *ptr_uv_string = new string[uv_line_count];
+		string *ptr_vn_string = new string[normal_line_count];
 
 		file.clear();
-		file.seekg(0);//przechodzimy na pocz¹tek danych pliku .obj
+		file.seekg(0);
 
-		for (int index = 0; index < numer_pierwszego_wiersza_poz_vert; index++)//pierwsze 3 wiersze w .obj nas nie interesuj¹ dlatego przechodzimy przez nie do pierwszego vertexa w .obj
+		for (int index = 0; index < first_line_pos_num_vert; index++)
 		{
-			getline(file, wiersz);
+			getline(file, line);
 		}
 
-		//pobieranie z .obj wierszy z danymi pozycji  w formie string i umieszczanie ich w tablicy typu string ptr_v_string
-		for (int index = 0; index < liczba_wierszy_pos; index++)//bêd¹c na pozycji pierwszego wiersza pozycji vertexa w.obj pobieram wiersz po wierszu 
+		for (int index = 0; index < pos_line_count; index++)
 		{
 			getline(file, ptr_v_string[index]);
 		}
 
-		//pobieranie z .obj wierszy z danymi uv  w formie string i umieszczanie ich w tablicy typu string ptr_uv_string
-		for (int index = 0; index < liczba_wierszy_uv; index++)// to samo co z wierszami pozyccji vertexów robimy z wierszami uv
+		for (int index = 0; index < uv_line_count; index++)
 		{
 			getline(file, ptr_uv_string[index]);
 		}
 
-		//pobieranie z .obj wierszy z danymi normalnymi  w formie string i umieszczanie ich w tablicy typu string ptr_vn_string
-		for (int index = 0; index < liczba_wierszy_normal; index++)
+		for (int index = 0; index < normal_line_count; index++)
 		{
 			getline(file, ptr_vn_string[index]);
 		}
 
-		getline(file, wiersz);
-		for (int index = 0; index < liczba_vertexow; index += 3)
+		getline(file, line);
+		for (int index = 0; index < vertex_count; index += 3)
 		{
-			//pobranie z .obj wiersza z numerami wierszy dla pozycji, uv-ki, wektora normalnego trzech vertexów danego trójk¹ta
-			getline(file, wiersz);
-			stringstream trojkat_string(wiersz);//pobieranie z pobranego wiersza samych numerów wierszy dla pozycji, uv-ki, wektora normalnego trzech vertexów danego trójk¹ta
-			getline(trojkat_string, niepotrzebny, ' ');
-			getline(trojkat_string, wiersz_poz_1vert, '/');
-			getline(trojkat_string, wiersz_uv_1vert, '/');
-			getline(trojkat_string, wiersz_normalnego_1vert, ' ');
-			getline(trojkat_string, wiersz_poz_2vert, '/');
-			getline(trojkat_string, wiersz_uv_2vert, '/');
-			getline(trojkat_string, wiersz_normalnego_2vert, ' ');
-			getline(trojkat_string, wiersz_poz_3vert, '/');
-			getline(trojkat_string, wiersz_uv_3vert, '/');
-			getline(trojkat_string, wiersz_normalnego_3vert, '\n');
+			getline(file, line);
+			stringstream trojkat_string(line);
+			getline(trojkat_string, useless, ' ');
+			getline(trojkat_string, line_pos_1vert, '/');
+			getline(trojkat_string, line_uv_1vert, '/');
+			getline(trojkat_string, line_nomrmal_1vert, ' ');
+			getline(trojkat_string, line_pos_2vert, '/');
+			getline(trojkat_string, line_uv_2vert, '/');
+			getline(trojkat_string, line_normal_2vert, ' ');
+			getline(trojkat_string, line_pos_3vert, '/');
+			getline(trojkat_string, line_uv_3vert, '/');
+			getline(trojkat_string, line_normal_3vert, '\n');
 
-			//1 vertex trójk¹ta
-			ptr_numery_wierszy_poz[index] = stoi(wiersz_poz_1vert) - 1;//odejmujemy 1, poniewa¿ pozycje wierszy w .obj liczone s¹ od 1, a my bêdziemy u¿ywaæ tych pozycji jako indexów w tablicach
-			ptr_numery_wierszy_uv[index] = stoi(wiersz_uv_1vert) - 1;// funkcja stoi konwertuje string na int
-			ptr_numery_wierszy_norm[index] = stoi(wiersz_normalnego_1vert) - 1;
+			ptr_pos_line_num[index] = stoi(line_pos_1vert) - 1;
+			ptr_uv_line_num[index] = stoi(line_uv_1vert) - 1;
+			ptr_norm_line_num[index] = stoi(line_nomrmal_1vert) - 1;
 
-			//2 vertex trójk¹ta
-			ptr_numery_wierszy_poz[index + 1] = stoi(wiersz_poz_2vert) - 1;
-			ptr_numery_wierszy_uv[index + 1] = stoi(wiersz_uv_2vert) - 1;
-			ptr_numery_wierszy_norm[index + 1] = stoi(wiersz_normalnego_2vert) - 1;
+			ptr_pos_line_num[index + 1] = stoi(line_pos_2vert) - 1;
+			ptr_uv_line_num[index + 1] = stoi(line_uv_2vert) - 1;
+			ptr_norm_line_num[index + 1] = stoi(line_normal_2vert) - 1;
 
-			//3 vertex trójk¹ta
-			ptr_numery_wierszy_poz[index + 2] = stoi(wiersz_poz_3vert) - 1;
-			ptr_numery_wierszy_uv[index + 2] = stoi(wiersz_uv_3vert) - 1;
-			ptr_numery_wierszy_norm[index + 2] = stoi(wiersz_normalnego_3vert) - 1;
+			ptr_pos_line_num[index + 2] = stoi(line_pos_3vert) - 1;
+			ptr_uv_line_num[index + 2] = stoi(line_uv_3vert) - 1;
+			ptr_norm_line_num[index + 2] = stoi(line_normal_3vert) - 1;
 		}
 
-		for (int index = 0; index < liczba_vertexow; index++)//dla kazdego vertexa
+		for (int index = 0; index < vertex_count; index++)
 		{
-			stringstream v_string(ptr_v_string[ptr_numery_wierszy_poz[index]]);//tutaj widaæ dlaczego odejmowaliœmy 1 od wszystkich pozycji danych 
-			v_string >> niepotrzebny >> x >> y >> z;// ze v_string przenosimy kolejno dane do niepotrzebny  x  y  z. Dane s¹ przenoszone po kolei st¹d koniecznoœæ zmiennej "niepotrzebny"
-			ptr_dane_do_renderu[(index * 8)] = stof(x);// funkcja stof konwertuje string na float
-			ptr_dane_do_renderu[(index * 8) + 1] = stof(y);
-			ptr_dane_do_renderu[(index * 8) + 2] = stof(z);
+			stringstream v_string(ptr_v_string[ptr_pos_line_num[index]]);
+			v_string >> useless >> x >> y >> z;
+			render_data[(index * 8)] = stof(x);
+			render_data[(index * 8) + 1] = stof(y);
+			render_data[(index * 8) + 2] = stof(z);
 
-			stringstream uv_string(ptr_uv_string[ptr_numery_wierszy_uv[index]]);
-			uv_string >> niepotrzebny >> u >> v;
-			ptr_dane_do_renderu[(index * 8) + 3] = stof(u);
-			ptr_dane_do_renderu[(index * 8) + 4] = stof(v);
+			stringstream uv_string(ptr_uv_string[ptr_uv_line_num[index]]);
+			uv_string >> useless >> u >> v;
+			render_data[(index * 8) + 3] = stof(u);
+			render_data[(index * 8) + 4] = stof(v);
 
-			stringstream vn_string(ptr_vn_string[ptr_numery_wierszy_norm[index]]);
-			vn_string >> niepotrzebny >> xn >> yn >> zn;
-			ptr_dane_do_renderu[(index * 8) + 5] = stof(xn);
-			ptr_dane_do_renderu[(index * 8) + 6] = stof(yn);
-			ptr_dane_do_renderu[(index * 8) + 7] = stof(zn);
+			stringstream vn_string(ptr_vn_string[ptr_norm_line_num[index]]);
+			vn_string >> useless >> xn >> yn >> zn;
+			render_data[(index * 8) + 5] = stof(xn);
+			render_data[(index * 8) + 6] = stof(yn);
+			render_data[(index * 8) + 7] = stof(zn);
 		}
-		delete[] ptr_numery_wierszy_poz;
-		delete[] ptr_numery_wierszy_uv;
-		delete[] ptr_numery_wierszy_norm;
+		delete[] ptr_pos_line_num;
+		delete[] ptr_uv_line_num;
+		delete[] ptr_norm_line_num;
 		delete[] ptr_v_string;
 		delete[] ptr_uv_string;
 		delete[] ptr_vn_string;
@@ -218,10 +202,10 @@ public:
 		file.seekg(0);
 		file.close();
 
-		ilosc_danych = liczba_wszyst_floatow_do_renderu * 4;
+		data_byets = to_render * 4;
 	}
 
-	void Load_Texture(const char *fname, int id)//wczytywanie tekstury
+	void LoadTexture(const char *fname, int id)
 	{
 		glGenTextures(1, &textures[id]);
 		tex[id] = &textures[id];
@@ -244,19 +228,12 @@ public:
 		stbi_image_free(data);
 	}
 
-	void draw_mesh(int id)
+	void DrawMesh(int id)
 	{	
-		int draw_vertices = ilosc_danych / 32;
-		glBufferData(GL_ARRAY_BUFFER, ilosc_danych, ptr_dane_do_renderu, GL_STATIC_DRAW);
+		int draw_vertices = data_byets / 32;
+		glBufferData(GL_ARRAY_BUFFER, data_byets, render_data, GL_STATIC_DRAW);
 		glBindTexture(GL_TEXTURE_2D, *tex[id]);
 		glDrawArrays(GL_TRIANGLES, 0, draw_vertices);
 	}
 };
-
-
-
-
-
-
-
 

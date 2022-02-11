@@ -1,7 +1,7 @@
 #version 330 core
-out vec4 FragColor;
-uniform sampler2D ourTexture;
-in vec2 TexCoords;
+layout (location = 0) in vec3 aPos;
+layout (location = 1) in vec3 aNormal;
+layout (location = 2) in vec2 aTexCoords;
 
 struct PointLight {
     vec3 position;  
@@ -36,11 +36,23 @@ struct SpotLight {
 vec3 CalcSpotLight(SpotLight light, vec3 normal, vec3 fragPos, vec3 viewDir);
 vec3 CalcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir);
 
-in vec3 Normal;  
-in vec3 FragPos;  
+out vec2 TexCoords;
+out vec3 LightingColor; // resulting color from lighting calculations
+
+
+uniform mat4 model;
+uniform mat4 view;
+uniform mat4 projection;
+
+// parametry dla mg造
+float visibility;
+const float density = 0.015;
+const float gradient = 1.5;
+
+vec3 Normal;  
+vec3 FragPos;  
 
 uniform vec3 viewPos; 
-vec3 objectColor = texture(ourTexture, TexCoords).xyz;
 
 uniform SpotLight light;
 uniform PointLight pointLight;
@@ -49,42 +61,49 @@ uniform PointLight secondPointLight;
 uniform int objectShine;
 
 // mg豉
-in float visibility;
 vec3 skyColor = vec3(1.0, 1.0, 1.0);
 
 // noc
 uniform float nightFactor;
 vec3 nightGlow = vec3(0.1, 0.6, 1.0);
 
-// g豉dki obiekt
-uniform bool drawSmoothObject;
-uniform vec3 smoothObjectColor;
-
 uniform bool blinn;
 
 void main()
 {
-        vec3 viewDir = normalize(viewPos - FragPos);
+    FragPos = vec3(model * vec4(aPos, 1.0));
 
-        if (drawSmoothObject) objectColor = smoothObjectColor;
+    vec4 positionRelativeToCam = view * vec4(model * vec4(aPos, 1.0));
+    float distance = length(positionRelativeToCam.xyz);
+    visibility = exp(-pow((distance*density), gradient));
+    visibility = clamp(visibility, 0.0, 1.0);
 
-        vec3 color = CalcSpotLight(light, Normal, FragPos, viewDir);
-        color += CalcPointLight(pointLight, Normal, FragPos, viewDir);
-        color += CalcPointLight(secondPointLight, Normal, FragPos, viewDir);
+    Normal = mat3(transpose(inverse(model))) * aNormal; 
 
-        // dodanie mg造 - wymieszanie koloru mg造 z kolorem obiektu
-        color = mix(skyColor, color, visibility);
 
-        // noc
-        color = mix(color, nightGlow, nightFactor / 4);
-        color *= (1 - nightFactor / 2);
+    // fragment shader
 
-        FragColor = vec4(color, 1.0);
+    vec3 viewDir = normalize(viewPos - FragPos);
+
+    vec3 color = CalcSpotLight(light, Normal, FragPos, viewDir);
+    color += CalcPointLight(pointLight, Normal, FragPos, viewDir);
+    color += CalcPointLight(secondPointLight, Normal, FragPos, viewDir);
+
+    // dodanie mg造 - wymieszanie koloru mg造 z kolorem obiektu
+    color = mix(skyColor, color, visibility);
+
+    // noc
+    color = mix(color, nightGlow, nightFactor / 4);
+    color *= (1 - nightFactor / 2);
+
+    TexCoords = aTexCoords;
+    LightingColor = color;
+
+    gl_Position = projection * view * model * vec4(aPos, 1.0);
 }
 
 vec3 CalcSpotLight(SpotLight light, vec3 Normal, vec3 FragPos, vec3 viewDir)
 {
-       // ambient
        vec3 ambient = light.ambient * light.color;
    
        // diffuse 
@@ -123,7 +142,7 @@ vec3 CalcSpotLight(SpotLight light, vec3 Normal, vec3 FragPos, vec3 viewDir)
        diffuse  *= attenuation;
        specular *= attenuation;
    
-       vec3 result = (ambient + diffuse + specular) * objectColor;
+       vec3 result = ambient + diffuse + specular;
 
        return result;
 }
@@ -157,5 +176,5 @@ vec3 CalcPointLight(PointLight light, vec3 Normal, vec3 fragPos, vec3 viewDir)
     ambient *= attenuation;
     diffuse *= attenuation;
     specular *= attenuation;
-    return (ambient + diffuse + specular) * objectColor;
+    return ambient + diffuse + specular;
 }
